@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (c) 2013-2016, Lawrence Livermore National Security, LLC.
+ * Copyright (c) 2013-2017, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory
  * Written by William Arrighi wjarrighi@llnl.gov
  * CODE-686965
@@ -138,8 +138,10 @@ main(
       dim = 1;
    }
    else {
-      printf("Illegal number of procs\n");
-      printf("Allowed number of proces is 1, 2, 4, 5, 10, 20, 25, 50, 100.\n");
+      if (rank == 0) {
+         printf("Illegal number of procs.\n");
+         printf("Allowed number of procs is 1, 2, 4, 5, 10, 20, 25, 50, 100.\n");
+      }
       return 1;
    }
 
@@ -158,6 +160,8 @@ main(
       1.0e-2,
       0.001,
       "",
+      false,
+      false,
       CAROM::Database::HDF5,
       0.1,
       0.8,
@@ -251,6 +255,9 @@ main(
 
       // Compute the product of the transpose of the static basis and the
       // incremental basis.  This should be a unitary matrix.
+      // We use a special version of transposeMult as the static basis is not
+      // distributed.  In the context of this test routine we "know" how the
+      // incremental basis is distributed so we can do the multiplication.
       CAROM::Matrix* test = transposeMult(static_basis, inc_basis);
       if (rank == 0) {
          for (int row = 0; row < test->numRows(); ++row) {

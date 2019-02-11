@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (c) 2013-2016, Lawrence Livermore National Security, LLC.
+ * Copyright (c) 2013-2017, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory
  * Written by William Arrighi wjarrighi@llnl.gov
  * CODE-686965
@@ -138,7 +138,10 @@ main(
       offset = rank;
    }
    else {
-      printf("Too many processors.  Only run on up to 6 processors.\n");
+      if (rank == 0) {
+         printf("Illegal number of procs.\n");
+         printf("Allowed number of procs is 1, 2, 3, 4, 5, or 6.\n");
+      }
       return 1;
    }
 
@@ -154,6 +157,8 @@ main(
       1.0e-2,
       0.11,
       "",
+      false,
+      false,
       CAROM::Database::HDF5,
       0.1,
       0.8,

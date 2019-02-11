@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (c) 2013-2016, Lawrence Livermore National Security, LLC.
+ * Copyright (c) 2013-2017, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory
  * Written by William Arrighi wjarrighi@llnl.gov
  * CODE-686965
@@ -106,6 +106,17 @@ class StaticSVD : public SVD
       const Matrix*
       getBasis();
 
+      /**
+       * @brief Returns the singular values for the current time interval.
+       *
+       * @post thisIntervalBasisCurrent()
+       *
+       * @return The singular values for the current time interval.
+       */
+      virtual
+      const Matrix*
+      getSingularValues();
+
    private:
       /**
        * @brief Unimplemented default constructor.
@@ -169,20 +180,6 @@ class StaticSVD : public SVD
       std::vector<double*> d_samples;
 
       /**
-       * @brief The globalized matrix U.
-       *
-       * U is large and each process owns all of U.
-       */
-      Matrix* d_U;
-
-      /**
-       * @brief The globalized matrix S.
-       *
-       * S is small and each process owns all of S.
-       */
-      Matrix* d_S;
-
-      /**
        * @brief The globalized matrix L.
        *
        * L is small and each process owns all of L.
@@ -194,6 +191,16 @@ class StaticSVD : public SVD
        * interval are up to date.
        */
       bool d_this_interval_basis_current;
+
+      /**
+       * @brief The rank of the process this object belongs to.
+       */
+      int d_rank;
+
+      /**
+       * @brief The number of processors being run on.
+       */
+      int d_num_procs;
 
       /**
        * @brief MPI message tag.

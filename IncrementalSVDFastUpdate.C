@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (c) 2013-2016, Lawrence Livermore National Security, LLC.
+ * Copyright (c) 2013-2017, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory
  * Written by William Arrighi wjarrighi@llnl.gov
  * CODE-686965
@@ -41,6 +41,7 @@
 //              using Matthew Brand's "fast update" method.
 
 #include "IncrementalSVDFastUpdate.h"
+#include "HDFDatabase.h"
 
 #include "mpi.h"
 
@@ -54,23 +55,73 @@ IncrementalSVDFastUpdate::IncrementalSVDFastUpdate(
    double linearity_tol,
    bool skip_linearly_dependent,
    int samples_per_time_interval,
+   bool save_state,
+   bool restore_state,
    bool debug_algorithm) :
    IncrementalSVD(dim,
       linearity_tol,
       skip_linearly_dependent,
       samples_per_time_interval,
+      save_state,
+      restore_state,
       debug_algorithm),
-   d_U(0),
    d_Up(0)
 {
+   CAROM_ASSERT(dim > 0);
+   CAROM_ASSERT(linearity_tol > 0.0);
+   CAROM_ASSERT(samples_per_time_interval > 0);
+
+   // If the state of the SVD is to be restored, do it now.  The base class,
+   // IncrementalSVD, has already opened the database and restored the state
+   // common to all incremental algorithms.  This particular class must also
+   // read the state of d_Up and then compute the basis.  If the database could
+   // not be found then we can not restore the state.
+   if (restore_state && d_state_database) {
+      // Read d_Up.
+      int num_rows;
+      d_state_database->getInteger("Up_num_rows", num_rows);
+      int num_cols;
+      d_state_database->getInteger("Up_num_cols", num_cols);
+      d_Up = new Matrix(num_rows, num_cols, true);
+      d_state_database->getDoubleArray("Up",
+                                       &d_Up->item(0, 0),
+                                       num_rows*num_cols);
+
+      // Close and delete the database.
+      d_state_database->close();
+      delete d_state_database;
+
+      // Compute the basis.
+      computeBasis();
+   }
 }
 
 IncrementalSVDFastUpdate::~IncrementalSVDFastUpdate()
 {
-   // Delete data members.
-   if (d_U) {
-      delete d_U;
+   // If the state of the SVD is to be saved, then create the database now.
+   // The IncrementalSVD base class destructor will save d_S and d_U.  This
+   // derived class must save its specific state data, d_Up.
+   //
+   // If there are multiple time intervals then saving and restoring the state
+   // does not make sense as there is not one, all encompassing, basis.
+   if (d_save_state && d_time_interval_start_times.size() == 1) {
+      // Create state database file.
+      char file_name[100];
+      sprintf(file_name, "state.%06d", d_rank);
+      d_state_database = new HDFDatabase();
+      d_state_database->create(file_name);
+
+      // Save d_Up.
+      int num_rows = d_Up->numRows();
+      d_state_database->putInteger("Up_num_rows", num_rows);
+      int num_cols = d_Up->numColumns();
+      d_state_database->putInteger("Up_num_cols", num_cols);
+      d_state_database->putDoubleArray("Up",
+                                       &d_Up->item(0, 0),
+                                       num_rows*num_cols);
    }
+
+   // Delete data members.
    if (d_Up) {
       delete d_Up;
    }
@@ -179,23 +230,26 @@ IncrementalSVDFastUpdate::addNewSample(
    delete d_U;
    d_U = newU;
 
-   // Form a temporary matrix, tmp, by add another row and column to
-   // d_Up.  Only the last value in the new row/column is non-zero and it is 1.
-   Matrix tmp(d_num_samples+1, d_num_samples+1, false);
+   // The new d_Up is the product of the current d_Up extended by another row
+   // and column and A.  The only new value in the extended version of d_Up
+   // that is non-zero is the new lower right value and it is 1.  We will
+   // construct this product without explicitly forming the extended version of
+   // d_Up.
+   Matrix* new_d_Up = new Matrix(d_num_samples+1, d_num_samples+1, false);
    for (int row = 0; row < d_num_samples; ++row) {
-      for (int col = 0; col < d_num_samples; ++col) {
-         tmp.item(row, col) = d_Up->item(row, col);
+      for (int col = 0; col < d_num_samples+1; ++col) {
+         double new_d_Up_entry = 0.0;
+         for (int entry = 0; entry < d_num_samples; ++entry) {
+            new_d_Up_entry += d_Up->item(row, entry)*A->item(entry, col);
+         }
+         new_d_Up->item(row, col) = new_d_Up_entry;
       }
-      tmp.item(row, d_num_samples) = 0.0;
    }
-   for (int col = 0; col < d_num_samples; ++col) {
-     tmp.item(d_num_samples, col) = 0.0;
+   for (int col = 0; col < d_num_samples+1; ++col) {
+      new_d_Up->item(d_num_samples, col) = A->item(d_num_samples, col);
    }
-   tmp.item(d_num_samples, d_num_samples) = 1.0;
-
-   // d_Up = tmp*A
    delete d_Up;
-   d_Up = tmp.mult(A);
+   d_Up = new_d_Up;
 
    // d_S = sigma.
    delete d_S;

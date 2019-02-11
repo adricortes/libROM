@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (c) 2013-2016, Lawrence Livermore National Security, LLC.
+ * Copyright (c) 2013-2017, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory
  * Written by William Arrighi wjarrighi@llnl.gov
  * CODE-686965
@@ -56,6 +56,8 @@ IncrementalSVDBasisGenerator::IncrementalSVDBasisGenerator(
    double sampling_tol,
    double max_time_between_samples,
    const std::string& basis_file_name,
+   bool save_state,
+   bool restore_state,
    Database::formats file_format,
    double min_sampling_time_step_scale,
    double sampling_time_step_scale,
@@ -63,14 +65,6 @@ IncrementalSVDBasisGenerator::IncrementalSVDBasisGenerator(
    bool debug_algorithm) :
    SVDBasisGenerator(basis_file_name, file_format)
 {
-   CAROM_ASSERT(dim > 0);
-   CAROM_ASSERT(linearity_tol > 0.0);
-   CAROM_ASSERT(initial_dt > 0.0);
-   CAROM_ASSERT(samples_per_time_interval > 0);
-   CAROM_ASSERT(sampling_tol > 0.0);
-   CAROM_ASSERT(max_time_between_samples > 0.0);
-   CAROM_ASSERT(min_sampling_time_step_scale < max_sampling_time_step_scale);
-
    d_svdsampler.reset(new IncrementalSVDSampler(dim,
                                                 linearity_tol,
                                                 skip_linearly_dependent,
@@ -79,6 +73,8 @@ IncrementalSVDBasisGenerator::IncrementalSVDBasisGenerator(
                                                 samples_per_time_interval,
                                                 sampling_tol,
                                                 max_time_between_samples,
+                                                save_state,
+                                                restore_state,
                                                 min_sampling_time_step_scale,
                                                 sampling_time_step_scale,
                                                 max_sampling_time_step_scale,

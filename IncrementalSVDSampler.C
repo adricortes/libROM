@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (c) 2013-2016, Lawrence Livermore National Security, LLC.
+ * Copyright (c) 2013-2017, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory
  * Written by William Arrighi wjarrighi@llnl.gov
  * CODE-686965
@@ -60,6 +60,8 @@ IncrementalSVDSampler::IncrementalSVDSampler(
    int samples_per_time_interval,
    double sampling_tol,
    double max_time_between_samples,
+   bool save_state,
+   bool restore_state,
    double min_sampling_time_step_scale,
    double sampling_time_step_scale,
    double max_sampling_time_step_scale,
@@ -72,16 +74,13 @@ IncrementalSVDSampler::IncrementalSVDSampler(
    d_dt(initial_dt),
    d_next_sample_time(0.0)
 {
-   CAROM_ASSERT(dim > 0);
-   CAROM_ASSERT(linearity_tol > 0.0);
    CAROM_ASSERT(initial_dt > 0.0);
-   CAROM_ASSERT(samples_per_time_interval > 0);
    CAROM_ASSERT(sampling_tol > 0.0);
    CAROM_ASSERT(max_time_between_samples > 0.0);
-   CAROM_ASSERT(min_sampling_time_step_scale > 0.0);
-   CAROM_ASSERT(sampling_time_step_scale > 0.0);
-   CAROM_ASSERT(max_sampling_time_step_scale > 0.0);
-   CAROM_ASSERT(min_sampling_time_step_scale < max_sampling_time_step_scale);
+   CAROM_ASSERT(min_sampling_time_step_scale >= 0.0);
+   CAROM_ASSERT(sampling_time_step_scale >= 0.0);
+   CAROM_ASSERT(max_sampling_time_step_scale >= 0.0);
+   CAROM_ASSERT(min_sampling_time_step_scale <= max_sampling_time_step_scale);
 
    if (fast_update) {
       d_svd.reset(
@@ -89,6 +88,8 @@ IncrementalSVDSampler::IncrementalSVDSampler(
             linearity_tol,
             skip_linearly_dependent,
             samples_per_time_interval,
+            save_state,
+            restore_state,
             debug_algorithm));
    }
    else {
@@ -97,7 +98,19 @@ IncrementalSVDSampler::IncrementalSVDSampler(
             linearity_tol,
             skip_linearly_dependent,
             samples_per_time_interval,
+            save_state,
+            restore_state,
             debug_algorithm));
+   }
+
+   // Get the number of processors.
+   int mpi_init;
+   MPI_Initialized(&mpi_init);
+   if (mpi_init) {
+     MPI_Comm_size(MPI_COMM_WORLD, &d_num_procs);
+   }
+   else {
+      d_num_procs = 1;
    }
 }
 
@@ -127,17 +140,6 @@ IncrementalSVDSampler::computeNextSampleTime(
    Vector u_vec(u_in, dim, true);
    if (u_vec.norm() == 0.0) {
       return d_next_sample_time;
-   }
-
-   // Get some preliminary info.
-   int mpi_init;
-   int num_procs;
-   MPI_Initialized(&mpi_init);
-   if (mpi_init) {
-     MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
-   }
-   else {
-      num_procs = 1;
    }
 
    // Get the current basis vectors.
@@ -177,7 +179,9 @@ IncrementalSVDSampler::computeNextSampleTime(
          local_norm = val;
       }
    }
-   if (num_procs == 1) {
+   delete eta;
+   delete eta_dot;
+   if (d_num_procs == 1) {
       global_norm = local_norm;
    }
    else {

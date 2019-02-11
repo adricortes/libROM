@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (c) 2013-2016, Lawrence Livermore National Security, LLC.
+ * Copyright (c) 2013-2017, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory
  * Written by William Arrighi wjarrighi@llnl.gov
  * CODE-686965
@@ -114,6 +114,28 @@ class Vector
          const Vector& rhs);
 
       /**
+       * @brief Sets the length of the vector and reallocates storage if
+       * needed.
+       *
+       * @param[in] dim When undistributed, the total dimension of the Vector.
+       *                When distributed, the part of the total dimension of
+       *                the Vector on this processor.
+       */
+      void
+      setSize(
+         int dim)
+      {
+         if (dim > d_alloc_size) {
+            if (d_vec) {
+               delete [] d_vec;
+            }
+            d_vec = new double [dim];
+            d_alloc_size = dim;
+         }
+         d_dim = dim;
+      }
+
+      /**
        * @brief Returns true if the Vector is distributed.
        *
        * @return True if the Vector is distributed.
@@ -166,11 +188,9 @@ class Vector
        */
       double
       inner_product(
-         const Vector* const other) const
+         const Vector* other) const
       {
          CAROM_ASSERT(other != 0);
-         CAROM_ASSERT(dim() == other->dim());
-         CAROM_ASSERT(distributed() == other->distributed());
          return inner_product(*other);
       }
 
@@ -206,7 +226,12 @@ class Vector
        */
       Vector*
       plus(
-         const Vector& other) const;
+         const Vector& other) const
+      {
+         Vector* result = 0;
+         plus(other, result);
+         return result;
+      }
 
       /**
        * @brief Adds other and this and returns the result, pointer version.
@@ -221,13 +246,26 @@ class Vector
        */
       Vector*
       plus(
-         const Vector* const other) const
+         const Vector* other) const
       {
          CAROM_ASSERT(other != 0);
-         CAROM_ASSERT(distributed() == other->distributed());
-         CAROM_ASSERT(dim() == other->dim());
          return plus(*other);
       }
+
+      /**
+       * @brief Adds other and this and fills result with the answer.
+       *
+       * @pre result == 0 || result->distributed() == distributed()
+       * @pre distributed() == other.distributed()
+       * @pre dim() == other.dim()
+       *
+       * @param[in] other The other summand.
+       * @param[out] result this + other
+       */
+      void
+      plus(
+         const Vector& other,
+         Vector*& result) const;
 
       /**
        * @brief Subtracts other and this and returns the result, reference
@@ -242,7 +280,12 @@ class Vector
        */
       Vector*
       minus(
-         const Vector& other) const;
+         const Vector& other) const
+      {
+         Vector* result = 0;
+         minus(other, result);
+         return result;
+      }
 
       /**
        * @brief Subtracts other and this and returns the result, pointer
@@ -258,13 +301,57 @@ class Vector
        */
       Vector*
       minus(
-         const Vector* const other) const
+         const Vector* other) const
       {
          CAROM_ASSERT(other != 0);
-         CAROM_ASSERT(distributed() == other->distributed());
-         CAROM_ASSERT(dim() == other->dim());
          return minus(*other);
       }
+
+      /**
+       * @brief Subtracts other and this and fills result with the answer.
+       *
+       * @pre result == 0 || result->distributed() == distributed()
+       * @pre distributed() == other.distributed()
+       * @pre dim() == other.dim()
+       *
+       * @param[in] other The other subtrahend.
+       * @param[out] result this - other
+       */
+      void
+      minus(
+         const Vector& other,
+         Vector*& result) const;
+
+      /**
+       * @brief Multiplies this by the supplied constant and returns the
+       * result.
+       *
+       * @param[in] factor Factor to multiply by.
+       *
+       * @return factor*this
+       */
+      Vector*
+      mult(
+         double factor) const
+      {
+         Vector* result = 0;
+         mult(factor, result);
+         return result;
+      }
+
+      /**
+       * @brief Multiplies this by the supplied constant and fills result with
+       * the answer.
+       *
+       * @pre result == 0 || result->distributed() == distributed()
+       *
+       * @param[in] factor Factor to multiply by.
+       * @param[out] result factor*this
+       */
+      void
+      mult(
+         double factor,
+         Vector*& result) const;
 
       /**
        * @brief Const Vector member access.
@@ -319,12 +406,24 @@ class Vector
       int d_dim;
 
       /**
+       * @brief The currently allocated size.
+       *
+       * d_dim <= d_alloc_size
+       */
+      int d_alloc_size;
+
+      /**
        * @brief If true, the Vector's dimensions are distributed over all
        * processors.
        *
        * Each processor does not need to hold the same number of dimensions.
        */
       bool d_distributed;
+
+      /**
+       * @brief The number of processors being run on.
+       */
+      int d_num_procs;
 };
 
 }

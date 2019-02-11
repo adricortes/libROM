@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (c) 2013-2016, Lawrence Livermore National Security, LLC.
+ * Copyright (c) 2013-2017, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory
  * Written by William Arrighi wjarrighi@llnl.gov
  * CODE-686965
@@ -70,7 +70,10 @@ class IncrementalSVDSampler : public SVDSampler
        * @pre samples_per_time_interval > 0
        * @pre sampling_tol > 0.0
        * @pre max_time_between_samples > 0.0
-       * @pre min_sampling_time_step_scale < max_sampling_time_step_scale
+       * @pre min_sampling_time_step_scale >= 0.0
+       * @pre sampling_time_step_scale >= 0.0
+       * @pre max_sampling_time_step_scale >= 0.0
+       * @pre min_sampling_time_step_scale <= max_sampling_time_step_scale
        *
        * @param[in] dim The dimension of the system on this processor.
        * @param[in] linearity_tol Tolerance to determine whether or not a
@@ -87,6 +90,13 @@ class IncrementalSVDSampler : public SVDSampler
        *                         followed by a lift back to full order space.
        * @param[in] max_time_between_samples Upper bound on time between
        *                                     samples.
+       * @param[in] save_state If true the state of the SVD will be written to
+       *                       disk when the object is deleted.  If there are
+       *                       multiple time intervals then the state will not
+       *                       be saved as restoring such a state makes no
+       *                       sense.
+       * @param[in] restore_state If true the state of the SVD will be restored
+       *                          when the object is created.
        * @param[in] min_sampling_time_step_scale Minimum overall scale factor
        *                                         to apply to time step.
        * @param[in] sampling_time_step_scale Scale factor to apply to sampling
@@ -106,6 +116,8 @@ class IncrementalSVDSampler : public SVDSampler
          int samples_per_time_interval,
          double sampling_tol,
          double max_time_between_samples,
+         bool save_state = false,
+         bool restore_state = false,
          double min_sampling_time_step_scale = 0.1,
          double sampling_time_step_scale = 0.8,
          double max_sampling_time_step_scale = 5.0,
@@ -211,6 +223,11 @@ class IncrementalSVDSampler : public SVDSampler
        * @brief Next time at which a sample should be taken.
        */
       double d_next_sample_time;
+
+      /**
+       * @brief The number of processors being run on.
+       */
+      int d_num_procs;
 };
 
 }

@@ -37,29 +37,23 @@
  *
  *****************************************************************************/
 
-// Description: The concrete wrapper class for static SVD algorithm and
-//              sampler.  Implements interface of SVDBasisGenerator.
+// Description: Interface to the DEIM algorithm to determine the rows of the
+// rhs to be sampled for the interpolation of the rhs.
 
-#include "StaticSVDBasisGenerator.h"
-#include "StaticSVDSampler.h"
+#ifndef included_DEIM_h
+#define included_DEIM_h
 
 namespace CAROM {
 
-StaticSVDBasisGenerator::StaticSVDBasisGenerator(
-   int dim,
-   int samples_per_time_interval,
-   const std::string& basis_file_name,
-   bool debug_algorithm,
-   Database::formats file_format) :
-   SVDBasisGenerator(basis_file_name, file_format)
-{
-   d_svdsampler.reset(new StaticSVDSampler(dim,
-                                           samples_per_time_interval,
-                                           debug_algorithm));
-}
+class Matrix;
 
-StaticSVDBasisGenerator::~StaticSVDBasisGenerator()
-{
-}
+void
+DEIM(const Matrix* f_basis,
+     int* f_sampled_row,
+     int* f_sampled_row_owner,
+     Matrix& f_basis_sampled_inv,
+     int myid);
 
 }
+
+#endif

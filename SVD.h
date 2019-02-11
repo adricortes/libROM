@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (c) 2013-2016, Lawrence Livermore National Security, LLC.
+ * Copyright (c) 2013-2017, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory
  * Written by William Arrighi wjarrighi@llnl.gov
  * CODE-686965
@@ -117,6 +117,15 @@ class SVD
       getBasis() = 0;
 
       /**
+       * @brief Returns the singular values for the current time interval.
+       *
+       * @return The singular values for the current time interval.
+       */
+      virtual
+      const Matrix*
+      getSingularValues() = 0;
+
+      /**
        * @brief Returns the number of time intervals on which different sets
        * of basis vectors are defined.
        *
@@ -185,6 +194,22 @@ class SVD
        * vectors.
        */
       Matrix* d_basis;
+
+      /**
+       * @brief The matrix U which is large.
+       *
+       * Depending on the SVD algorithm, d_U may be  distributed across all
+       * processors or each processor may own all of U.
+       */
+      Matrix* d_U;
+
+      /**
+       * @brief The matrix S which is small.
+       *
+       * For all SVD algorithms, S is not distributed and the entire matrix
+       * exists on each processor.
+       */
+      Matrix* d_S;
 
       /**
        * @brief The simulation time at which each time interval starts.

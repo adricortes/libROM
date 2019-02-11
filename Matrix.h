@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (c) 2013-2016, Lawrence Livermore National Security, LLC.
+ * Copyright (c) 2013-2017, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory
  * Written by William Arrighi wjarrighi@llnl.gov
  * CODE-686965
@@ -120,6 +120,30 @@ class Matrix
          const Matrix& rhs);
 
       /**
+       * @brief Sets the number of rows and columns of the matrix and
+       * reallocates storage if needed.
+       *
+       * @param[in] num_rows New number of rows
+       * @param[in] num_cols New number of cols
+       */
+      void
+      setSize(
+         int num_rows,
+         int num_cols)
+      {
+         int new_size = num_rows*num_cols;
+         if (new_size > d_alloc_size) {
+            if (d_mat) {
+               delete [] d_mat;
+            }
+            d_mat = new double [new_size];
+            d_alloc_size = new_size;
+         }
+         d_num_rows = num_rows;
+         d_num_cols = num_cols;
+      }
+
+      /**
        * @brief Returns true if the Matrix is distributed.
        *
        * @return True if the Matrix is distributed.
@@ -171,7 +195,12 @@ class Matrix
        */
       Matrix*
       mult(
-         const Matrix& other) const;
+         const Matrix& other) const
+      {
+        Matrix* result = 0;
+        mult(other, result);
+        return result;
+      }
 
       /**
        * @brief Multiplies this Matrix with other and returns the product,
@@ -191,22 +220,44 @@ class Matrix
        */
       Matrix*
       mult(
-         const Matrix* const other) const
+         const Matrix* other) const
       {
          CAROM_ASSERT(other != 0);
-         CAROM_ASSERT(!other->distributed());
-         CAROM_ASSERT(numColumns() == other->numRows());
          return mult(*other);
       }
+
+
+      /**
+       * @brief Multiplies this Matrix with other and fills result with the
+       * answer.
+       *
+       * Supports multiplication of two undistributed matrices resulting in an
+       * undistributed Matrix, and multiplication of a distributed Matrix with
+       * an undistributed Matrix resulting in a distributed Matrix.  If result
+       * has not been allocated it will be, otherwise it will be size
+       * accordingly.
+       *
+       * @pre result == 0 || result->distributed() == distributed()
+       * @pre !other->distributed()
+       * @pre numColumns() == other->numRows()
+       *
+       * @param[in] other The Matrix to multiply with this.
+       * @param[out] result The product Matrix.
+       */
+      void
+      mult(
+         const Matrix& other,
+         Matrix*& result) const;
 
       /**
        * @brief Multiplies this Matrix with other and returns the product,
        * reference version.
        *
-       * Supports multiplication of a distributed Matrix and an undistributed
-       * Vector returning a distributed Vector.
+       * Supports multiplication of an undistributed Matrix and Vector
+       * returning an undistributed Vector, and multiplication of a distributed
+       * Matrix and an undistributed Vector returning a distributed Vector.
        *
-       * @pre distributed() && !other.distributed()
+       * @pre !other.distributed()
        * @pre numColumns() == other.dim()
        *
        * @param[in] other The Vector to multiply with this.
@@ -215,17 +266,24 @@ class Matrix
        */
       Vector*
       mult(
-         const Vector& other) const;
+         const Vector& other) const
+      {
+         Vector* result = 0;
+         mult(other, result);
+         return result;
+      }
+       
 
       /**
        * @brief Multiplies this Matrix with other and returns the product,
        * pointer version.
        *
-       * Supports multiplication of a distributed Matrix and an undistributed
-       * Vector returning a distributed Vector.
+       * Supports multiplication of an undistributed Matrix and Vector
+       * returning an undistributed Vector, and multiplication of a distributed
+       * Matrix and an undistributed Vector returning a distributed Vector.
        *
        * @pre other != 0
-       * @pre distributed() && !other->distributed()
+       * @pre !other->distributed()
        * @pre numColumns() == other->dim()
        *
        * @param[in] other The Vector to multiply with this.
@@ -234,13 +292,55 @@ class Matrix
        */
       Vector*
       mult(
-         const Vector* const other) const
+         const Vector* other) const
       {
          CAROM_ASSERT(other != 0);
-         CAROM_ASSERT(distributed() && !other->distributed());
-         CAROM_ASSERT(numColumns() == other->dim());
          return mult(*other);
       }
+
+      /**
+       * @brief Multiplies this Matrix with other and fills result with the
+       * answer.
+       *
+       * Supports multiplication of an undistributed Matrix and Vector
+       * resulting in an undistributed Vector, and multiplication of a
+       * distributed Matrix and an undistributed Vector resulting in a
+       * distributed Vector.
+       *
+       * @pre result == 0 || result->distributed() == distributed()
+       * @pre !other->distributed()
+       * @pre numColumns() == other->dim()
+       *
+       * @param[in] other The Vector to multiply with this.
+       * @param[out] result The product Vector.
+       */
+      void
+      mult(
+         const Vector& other,
+         Vector*& result) const;
+
+      /**
+       * @brief Computes a += this*b*c.
+       *
+       * Supports accumulation of the multiplication of an undistributed
+       * Matrix and Vector into an undistributed Vector, and accumulation of
+       * the multiplication of a distributed Matrix and an undistributed
+       * Vector into a distributed Vector.
+       *
+       * @pre a.distributed() == distributed()
+       * @pre !b->distributed()
+       * @pre numColumns() == b.dim()
+       * @pre numRows() = a.dim()
+       *
+       * @param[in,out] a The Vector to accumulate this*b into.
+       * @param[in] b The Vector multiplied by this.
+       * @param[in] c Scalar multiplication factor.
+       */
+      void
+      multPlus(
+         Vector& a,
+         const Vector& b,
+         double c) const;
 
       /**
        * @brief Multiplies the transpose of this Matrix with other and returns
@@ -259,7 +359,12 @@ class Matrix
        */
       Matrix*
       transposeMult(
-         const Matrix& other) const;
+         const Matrix& other) const
+      {
+         Matrix* result = 0;
+         transposeMult(other, result);
+         return result;
+      }
 
       /**
        * @brief Multiplies the transpose of this Matrix with other and returns
@@ -279,22 +384,40 @@ class Matrix
        */
       Matrix*
       transposeMult(
-         const Matrix* const other) const
+         const Matrix* other) const
       {
          CAROM_ASSERT(other != 0);
-         CAROM_ASSERT(distributed() == other->distributed());
-         CAROM_ASSERT(numRows() == other->numRows());
          return transposeMult(*other);
       }
+
+      /**
+       * @brief Multiplies the transpose of this Matrix with other and fills
+       * result with the answer.
+       *
+       * Supports multiplication of two undistributed matrices or two
+       * distributed matrices resulting in an undistributed Matrix.
+       *
+       * @pre result == 0 || !result->distributed()
+       * @pre distributed() == other.distributed()
+       * @pre numRows() == other.numRows()
+       *
+       * @param[in] other The Matrix to multiply with this.
+       * @param[out] result The product Matrix.
+       */
+      void
+      transposeMult(
+         const Matrix& other,
+         Matrix*& result) const;
 
       /**
        * @brief Multiplies the transpose of this Matrix with other and returns
        * the product, reference version.
        *
-       * Supports multiplication of a distributed Matrix and a distributed
-       * Vector returning an undistributed Vector.
+       * Supports multiplication of an undistributed Matrix and an
+       * undistributed Vector or a distributed Matrix and a distributed Vector
+       * returning an undistributed Vector.
        *
-       * @pre distributed() && other.distributed()
+       * @pre distributed() == other.distributed()
        * @pre numRows() == other.dim();
        *
        * @param[in] other The Vector to multiply with this.
@@ -303,17 +426,23 @@ class Matrix
        */
       Vector*
       transposeMult(
-         const Vector& other) const;
+         const Vector& other) const
+      {
+         Vector* result = 0;
+         transposeMult(other, result);
+         return result;
+      }
 
       /**
        * @brief Multiplies the transpose of this Matrix with other and returns
        * the product, pointer version.
        *
-       * Supports multiplication of a distributed Matrix and a distributed
-       * Vector returning an undistributed Vector.
+       * Supports multiplication of an undistributed Matrix and an
+       * undistributed Vector or a distributed Matrix and a distributed Vector
+       * returning an undistributed Vector.
        *
        * @pre other != 0
-       * @pre distributed() && other->distributed()
+       * @pre distributed() == other->distributed()
        * @pre numRows() == other->dim();
        *
        * @param[in] other The Vector to multiply with this.
@@ -322,13 +451,71 @@ class Matrix
        */
       Vector*
       transposeMult(
-         const Vector* const other) const
+         const Vector* other) const
       {
          CAROM_ASSERT(other != 0);
-         CAROM_ASSERT(distributed() && other->distributed());
-         CAROM_ASSERT(numRows() == other->dim());
          return transposeMult(*other);
       }
+
+      /**
+       * @brief Multiplies the transpose of this Matrix with other and fills
+       * result with the answer.
+       *
+       * Supports multiplication of an undistributed Matrix and an
+       * undistributed Vector or a distributed Matrix and a distributed Vector
+       * resulting in an undistributed Vector.
+       *
+       * @pre result == 0 || !result->distributed()
+       * @pre distributed() == other->distributed()
+       * @pre numRows() == other->dim();
+       *
+       * @param[in] other The Vector to multiply with this.
+       * @param[out] result The product Vector.
+       */
+      void
+      transposeMult(
+         const Vector& other,
+         Vector*& result) const;
+
+      /**
+       * @brief Computes and returns the inverse of this.
+       *
+       * @pre !distributed()
+       * @pre numRows() == numColumns()
+       *
+       * @return The inverse of this.
+       */
+      Matrix*
+      inverse() const
+      {
+         Matrix* result = 0;
+         inverse(result);
+         return result;
+      }
+
+      /**
+       * @brief Computes and returns the inverse of this.
+       *
+       * @pre result == 0 || (!result->distributed() &&
+       *                      result->numRows() == numRows() &&
+       *                      result->numColumns() == numColumns())
+       * @pre !distributed()
+       * @pre numRows() == numColumns()
+       *
+       * @param[out] result The inverse of this.
+       */
+      void
+      inverse(
+         Matrix*& result) const;
+
+      /**
+       * @brief Computes the inverse of this and stores result in this.
+       *
+       * @pre !distributed()
+       * @pre numRows() == numColumns()
+       */
+      void
+      inverse();
 
       /**
        * @brief Const Matrix member access.
@@ -397,11 +584,23 @@ class Matrix
       int d_num_cols;
 
       /**
+       * @brief The currently allocated size.
+       *
+       * d_num_row*d_num_cols <= d_alloc_size
+       */
+      int d_alloc_size;
+
+      /**
        * @brief If true, the Matrix's rows are distributed over all processors.
        *
        * Each processor does not need to hold the same number of rows.
        */
       bool d_distributed;
+
+      /**
+       * @brief The number of processors being run on.
+       */
+      int d_num_procs;
 };
 
 }

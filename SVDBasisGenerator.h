@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (c) 2013-2016, Lawrence Livermore National Security, LLC.
+ * Copyright (c) 2013-2017, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory
  * Written by William Arrighi wjarrighi@llnl.gov
  * CODE-686965
@@ -66,20 +66,6 @@ class Matrix;
 class SVDBasisGenerator
 {
    public:
-      /**
-       * @brief Constructor.
-       *
-       * @param[in] basis_file_name The base part of the name of the file
-       *                            containing the basis vectors.  Each process
-       *                            will append its process ID to this base
-       *                            name.
-       * @param[in] file_format The format of the file containing the basis
-       *                        vectors.
-       */
-      SVDBasisGenerator(
-         const std::string& basis_file_name = "",
-         Database::formats file_format = Database::HDF5);
-
       /**
        * @brief Destructor.
        */
@@ -188,6 +174,18 @@ class SVDBasisGenerator
       }
 
       /**
+       * @brief Returns the singular values for the current time interval as a
+       * Matrix.
+       *
+       * @return The singular values for the current time interval.
+       */
+      const Matrix*
+      getSingularValues()
+      {
+         return d_svdsampler->getSingularValues();
+      }
+
+      /**
        * @brief Returns the number of time intervals on which different sets of
        * basis vectors are defined.
        *
@@ -219,6 +217,25 @@ class SVDBasisGenerator
       }
 
    protected:
+      /**
+       * @brief Constructor.
+       *
+       * Although all member functions are implemented by delegation to either
+       * d_basis_writer or d_svdsampler, this class is still abstract.  In this
+       * context it is not yet known which SVDSampler to instantiate.  Hence an
+       * instance of this class may not be constructed.
+       *
+       * @param[in] basis_file_name The base part of the name of the file
+       *                            containing the basis vectors.  Each process
+       *                            will append its process ID to this base
+       *                            name.
+       * @param[in] file_format The format of the file containing the basis
+       *                        vectors.
+       */
+      SVDBasisGenerator(
+         const std::string& basis_file_name = "",
+         Database::formats file_format = Database::HDF5);
+
       /**
        * @brief Writer of basis vectors.
        */
